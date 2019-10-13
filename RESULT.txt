@@ -1,0 +1,163 @@
+Group Details:
+Name: Roopashree N
+USN: 1KS17CS064
+Name: Sai Sneha S V
+USN: 1KS17CS070
+
+GitHub Repository Link: https://github.com/saisnehasv/CN_Assignment-2
+
+
+Question: A03. Implement GBN protocol. Write a sender and receiver program using UDP socket programming with a window size of 4, and using 10 sequence numbers i.e. 0, 1, ..., 9. Sender should send N (Configurable e.g. 12) packets and uses a timeout value of 2 seconds. Receiver program would run using socket number 20000+x, where x corresponds to last 2 three digits of your USN number. The message would have msg header value as its sequence number and content as "message number N" + md5sum checksum value, where N corresponds to sequence number. You can use md5sum checksum library to compute checksum. Consider the case. Sender should exit when it receives ack for the last packet i.e. Nth packet. Receiver implements a buffer of size K i.e. i.e. it can store up to K-1 packets received out of order. Thus, whenever it receives a packet in order, it will send the ack corresponding to last packet in buffer which is in order. Implement a lossy channel as receiver side losing every Ith ack packet (e.g. I=4). Whenever sender and receiver receives a message, these are displayed on terminal.
+
+Thus invocation of sender and receiver program would be as folloqa
+Receiver program would run for ever.
+./sender <W> <S> <N> <T> <receiver IP> <receiver port>
+  W - window size
+  S - Max sequence number
+  N - number of messages to send
+  T - timeout value (in seconds) waiting for ack
+
+./receiver <S> <I> <K> <receiver port>
+  I - every Ith  ack from receiver side is lost
+  K - buffer size in terms of messages
+
+Solution: 
+The problem wants us to create a UDP connection between a sender program and reciever program which sends data packets implementing Go-Back-N protocol and the reciever should implement a buffer to store the packets that arrive out of order, usually in GBN when the packets arrive out of order they are discarded and it waits for the sender to send the window of packets again.
+GBN protocol implements a cumulative ack which is only one acknowledgement is used for many packets 
+The main advantage of using cumulative Ack is that the traffic is less in the channel.
+The main disadvantage is that if one ack is lost that would mean that all the packets sent are lost.
+
+
+The programs we attempted to design would include a main function under the 'sender class'  and 'packet class'. 
+The main function would call other functions to:
+1. To check whether the whole window has been sent (isWindowFull())
+2. To maintain a timer for the packets sent ( Timer timeouttask())
+3. To call the 'packet class'  by creating an object. The 'packet class' would include functions to create data packets with sequence numbers, message to be sent and the check sum 
+int seqNum;
+String m="";
+ 4. The packet class would call the check sum function to calculate the check sum for the data to be sent 
+int checkSum= calc_checkSum(String m)
+5. Now, it would call the 'send_pkt()' to send the data packet and 'recieve_ack()' to recieve the acknowledgement from the reciever.
+
+Sender Side:
+
+class Packet{
+    private int seqNum;
+    private byte[] data=new byte[1024];
+    //include checksum
+    Packet(int seqNum, byte[] data) throws Exception 
+    {
+        this.seqNum = seqNum;
+        this.data =data;
+    }
+    public static Packet createPkt(int seqNum) throws Exception 
+     {
+    	 String s="Message Number"+seqNum;
+    	 byte []d=s.getBytes();
+        return new Packet(seqNum,d);
+    }
+}
+
+  public void send_pkt() throws Exception {
+		 
+		
+		DatagramSocket sender=new DatagramSocket();
+                                       InetAddress ia=InetAddress.getLocalHost();//to get the IP address
+                                       DatagramPacket dp=new  DatagramPacket(data,data.length,ia,2070);//to create the packet
+		sender.send(dp);//to send it to the server 
+		String str=new String(dp.getData());
+		System.out.println("Sending:"+str);
+    }
+public void recieve_Ack() throws Exception
+	{
+		
+		DatagramSocket sender=new DatagramSocket();
+                                       byte []ack=new byte[1024];
+		DatagramPacket dp1=new DatagramPacket(ack,ack.length);
+		sender.receive(dp1);
+		String str=new String(dp1.getData());//to extract the data to process it 
+		System.out.println("Receiving:"+str);
+	   } 
+}
+Reciever Side:
+
+class Packet{
+    private int seqNum;
+    private byte[] data=new byte[1024];
+    //include checksum
+    Packet(int seqNum, byte[] data) throws Exception 
+    {
+        this.seqNum = seqNum;
+        this.data =data;
+    }
+    public static Packet createAck(int seqNum) throws Exception 
+     {
+    	 String s="Acknowledgement"+seqNum;
+    	 byte []d=s.getBytes();
+        return new Packet(seqNum,d);
+    }
+}
+
+  public void send_ack() throws Exception {
+		 
+		
+		DatagramSocket rcv=new DatagramSocket();
+                                       InetAddress ia=InetAddress.getLocalHost();//to get the IP address
+                                       DatagramPacket dp=new  DatagramPacket(ack,ack.length,ia,2070);//to create the packet
+		rcv.send(dp);//to send it to the server 
+		String str=new String(dp.getData());
+		System.out.println("Sending:"+str);
+    }
+public void recieve_Pkt() throws Exception
+	{
+		
+		DatagramSocket rcv=new DatagramSocket();
+                                       byte []ack=new byte[1024];
+		DatagramPacket dp1=new DatagramPacket(pkt,pkt.length);
+		rcv.receive(dp1);
+		String str=new String(dp1.getData());//to extract the data to process it 
+		System.out.println("Receiving:"+str);
+	   } 
+}
+ 
+1. Recieves the data packet and checks the checksum. If the packet recieved is in order and then check sum did not match, then the packet is discarded.
+2. If the recieved packet is out of order then it is saved in the buffer.
+3. The order of packets is checked using:
+if( seqNum == expectedseqNum)
+where 'expectedseqNum' is the sequence number generated by the reciever side.
+if the packets are recieved in order, then acknowledgement is sent to the reciever side containing the sequence number of the last packet that arrived in order.
+
+Challenges Faced:
+1. The first challenge was to understand the working and need for buffer at the reciever side. 
+we succeeded at understanding why the buffer was needed and how it would help but it was a little complicated to code the same.
+The buffer should be coded in such a way that it stores the out of order data packets, waits for the lost packet to be sent by the sender.
+Once recieved, it should use the packets in buffer, send the ack and move the window. This would prevent the sender from sending all the packets again.
+
+2. Since it involves too many variables and functions to be synchronised and to be called at specific conditions, we kept encountering errors that would block us from coding further.
+
+Since we could not overcome these challenges in time,we could not complete the assignment .
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
